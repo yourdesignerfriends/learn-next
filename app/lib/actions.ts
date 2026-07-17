@@ -8,6 +8,10 @@ import postgres from 'postgres';
 // I keep the database connection at the top for clarity.
 const sql = postgres(process.env.POSTGRES_URL!, { ssl: 'require' });
 
+// ADD THESE IMPORTS FOR AUTH
+import { signIn } from '@/auth';
+import { AuthError } from 'next-auth';
+
 // This is the state shape that useActionState expects.
 // I include both field-level errors and a general message.
 export type State = {
@@ -27,6 +31,31 @@ const FormSchema = z.object({
   status: z.enum(['pending', 'paid']),
   date: z.string(),
 });
+
+// I handle user authentication using NextAuth's signIn function.
+// This action will be used by the login form with useActionState.
+export async function authenticate(
+  prevState: string | undefined,
+  formData: FormData,
+) {
+  try {
+    // I attempt to sign in using the credentials provider.
+    await signIn('credentials', formData);
+  } catch (error) {
+    // If NextAuth throws an AuthError, I return a friendly message.
+    if (error instanceof AuthError) {
+      switch (error.type) {
+        case 'CredentialsSignin':
+          return 'Invalid credentials.';
+        default:
+          return 'Something went wrong.';
+      }
+    }
+
+    // If it's not an AuthError, I rethrow it so the app can handle it.
+    throw error;
+  }
+}
 
 // For creating invoices, I omit id and date because they are generated.
 const CreateInvoice = FormSchema.omit({ id: true, date: true });
